@@ -1,0 +1,115 @@
+import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
+import org.gradle.internal.jvm.Jvm
+import proguard.gradle.ProGuardTask
+
+buildscript {
+  repositories {
+    mavenCentral()
+  }
+  dependencies {
+    // no plugin for this?
+    classpath 'com.guardsquare:proguard-gradle:7.1.0'
+  }
+}
+
+plugins {
+  id 'org.jetbrains.kotlin.jvm'
+  id 'application'
+  id 'maven-publish'
+  id 'com.github.johnrengelman.shadow'
+}
+
+group = 'mutual.aid'
+version = '1.0'
+
+dependencies {
+  implementation platform('org.jetbrains.kotlin:kotlin-bom')
+}
+
+application {
+  mainClass = 'mutual.aid.AppKt'
+}
+
+tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {
+  kotlinOptions {
+    jvmTarget = JavaVersion.VERSION_11
+  }
+}
+
+def shadowJar = tasks.named('shadowJar', ShadowJar) {
+  // the jar remains up to date even when changing the excludes
+  // https://github.com/johnrengelman/shadow/issues/62#issuecomment-877728948
+  outputs.upToDateWhen { false }
+
+  group = 'Build'
+  description = 'Produces a fat jar'
+  archiveFileName = "$archivesBaseName-${version}-all.jar"
+  reproducibleFileOrder = true
+
+  from sourceSets.main.output
+  from project.configurations.runtimeClasspath
+
+  manifest.attributes('Main-Class': 'AppKt')
+
+  // TODO doesn't work for Kotlin? https://github.com/johnrengelman/shadow/issues/688
+//  minimize()
+
+  exclude '**/*.kotlin_metadata'
+  exclude '**/*.kotlin_module'
+  exclude 'META-INF/maven/**'
+}
+
+def minifiedJarName = "${project.name}-${version}-minified.jar"
+def minify = tasks.register('minify', ProGuardTask) {
+  configuration rootProject.file('proguard.pro')
+
+  injars(shadowJar.flatMap { it.archiveFile })
+  outjars(layout.buildDirectory.file("libs/$minifiedJarName"))
+
+  libraryjars(jdkJars())
+  libraryjars(filter: '!**META-INF/versions/**.class', configurations.compileClasspath)
+}
+
+def startShadowScripts = tasks.named('startShadowScripts', CreateStartScripts) {
+  classpath = files(minify)
+}
+
+def minifiedDistZip = tasks.register('minifiedDistZip', Zip) { zipTask ->
+  def zipRoot = "/${project.name}-${version}"
+  zipTask.from(minify) {
+    into("$zipRoot/lib")
+  }
+  zipTask.from(startShadowScripts) {
+    into("$zipRoot/bin")
+  }
+}
+
+publishing {
+  publications {
+    mainDistribution(MavenPublication) {
+      artifact distZip
+    }
+    minifiedDistribution(MavenPublication) {
+      artifact minifiedDistZip
+    }
+  }
+}
+
+/**
+ * @return The JDK, for use by Proguard.
+ */
+List<File> jdkJars() {
+  Jvm jvm = Jvm.current()
+  FilenameFilter filter = { _, fileName -> fileName.endsWith(".jar") || fileName.endsWith(".jmod") }
+
+  return ['jmods' /* JDK 9+ */, 'bundle/Classes' /* mac */, 'jre/lib' /* linux */]
+    .collect { new File(jvm.javaHome, it) }
+    .findAll { it.exists() }
+    .collectMany { it.listFiles(filter) as List }
+    .toSorted()
+    .tap {
+      if (isEmpty()) {
+        throw new IllegalStateException("Could not find JDK ${jvm.javaVersion.majorVersion} runtime")
+      }
+    }
+}

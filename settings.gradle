@@ -1,0 +1,19 @@
+pluginManagement {
+  repositories {
+    gradlePluginPortal()
+    mavenCentral()
+  }
+  plugins {
+    id 'org.jetbrains.kotlin.jvm' version '1.5.20'
+    id 'com.github.johnrengelman.shadow' version '7.0.0'
+  }
+}
+
+dependencyResolutionManagement {
+  repositories {
+    mavenCentral()
+  }
+}
+
+rootProject.name = 'mutual-aid'
+include('app')
