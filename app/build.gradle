@@ -49,7 +49,7 @@ def shadowJar = tasks.named('shadowJar', ShadowJar) {
   from sourceSets.main.output
   from project.configurations.runtimeClasspath
 
-  manifest.attributes('Main-Class': 'AppKt')
+  manifest.attributes('Main-Class': application.mainClass.get())//'mutual.aid.AppKt')
 
   // TODO doesn't work for Kotlin? https://github.com/johnrengelman/shadow/issues/688
 //  minimize()
@@ -68,6 +68,10 @@ def minify = tasks.register('minify', ProGuardTask) {
 
   libraryjars(jdkJars())
   libraryjars(filter: '!**META-INF/versions/**.class', configurations.compileClasspath)
+}
+
+tasks.register('runMin', JavaExec) {
+  classpath = files(minify)
 }
 
 def startShadowScripts = tasks.named('startShadowScripts', CreateStartScripts) {

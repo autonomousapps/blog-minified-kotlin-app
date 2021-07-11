@@ -1,5 +1,6 @@
 package mutual.aid
 
-fun main() {
-  println("Hello, world!")
+fun main(args: Array<String>) {
+  val arg = args.firstOrNull() ?: "world"
+  println("Hello, $arg!")
 }
