@@ -16,4 +16,4 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = 'mutual-aid'
-include('app')
+include('echo')

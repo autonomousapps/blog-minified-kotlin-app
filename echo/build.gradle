@@ -49,12 +49,12 @@ def shadowJar = tasks.named('shadowJar', ShadowJar) {
   from sourceSets.main.output
   from project.configurations.runtimeClasspath
 
-  // Doesn't work for Kotlin? https://github.com/johnrengelman/shadow/issues/688
-  //minimize()
-
   exclude '**/*.kotlin_metadata'
   exclude '**/*.kotlin_module'
   exclude 'META-INF/maven/**'
+
+  // Doesn't work for Kotlin? https://github.com/johnrengelman/shadow/issues/688
+  //minimize()
 }
 
 def minify = tasks.register('minify', ProGuardTask) {
