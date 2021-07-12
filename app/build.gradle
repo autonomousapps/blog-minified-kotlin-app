@@ -15,8 +15,8 @@ buildscript {
 plugins {
   id 'org.jetbrains.kotlin.jvm'
   id 'application'
-  id 'maven-publish'
   id 'com.github.johnrengelman.shadow'
+  id 'maven-publish'
 }
 
 group = 'mutual.aid'
@@ -49,24 +49,21 @@ def shadowJar = tasks.named('shadowJar', ShadowJar) {
   from sourceSets.main.output
   from project.configurations.runtimeClasspath
 
-  manifest.attributes('Main-Class': application.mainClass.get())//'mutual.aid.AppKt')
-
-  // TODO doesn't work for Kotlin? https://github.com/johnrengelman/shadow/issues/688
-//  minimize()
+  // Doesn't work for Kotlin? https://github.com/johnrengelman/shadow/issues/688
+  //minimize()
 
   exclude '**/*.kotlin_metadata'
   exclude '**/*.kotlin_module'
   exclude 'META-INF/maven/**'
 }
 
-def minifiedJarName = "${project.name}-${version}-minified.jar"
 def minify = tasks.register('minify', ProGuardTask) {
   configuration rootProject.file('proguard.pro')
 
   injars(shadowJar.flatMap { it.archiveFile })
-  outjars(layout.buildDirectory.file("libs/$minifiedJarName"))
+  outjars(layout.buildDirectory.file("libs/${project.name}-${version}-minified.jar"))
 
-  libraryjars(jdkJars())
+  libraryjars(javaRuntime())
   libraryjars(filter: '!**META-INF/versions/**.class', configurations.compileClasspath)
 }
 
@@ -80,6 +77,7 @@ def startShadowScripts = tasks.named('startShadowScripts', CreateStartScripts) {
 
 def minifiedDistZip = tasks.register('minifiedDistZip', Zip) { zipTask ->
   def zipRoot = "/${project.name}-${version}"
+  zipTask.archiveClassifier = 'minified'
   zipTask.from(minify) {
     into("$zipRoot/lib")
   }
@@ -90,9 +88,6 @@ def minifiedDistZip = tasks.register('minifiedDistZip', Zip) { zipTask ->
 
 publishing {
   publications {
-    mainDistribution(MavenPublication) {
-      artifact distZip
-    }
     minifiedDistribution(MavenPublication) {
       artifact minifiedDistZip
     }
@@ -100,9 +95,9 @@ publishing {
 }
 
 /**
- * @return The JDK, for use by Proguard.
+ * @return The JDK runtime, for use by Proguard.
  */
-List<File> jdkJars() {
+List<File> javaRuntime() {
   Jvm jvm = Jvm.current()
   FilenameFilter filter = { _, fileName -> fileName.endsWith(".jar") || fileName.endsWith(".jmod") }
 
